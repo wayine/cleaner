@@ -1,0 +1,48 @@
+name: cleaner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  w:
+    name: 'Clean x-pipe/w'
+    runs-on: ubuntu-latest
+    steps:
+    - name: 'Checkout code base'
+      uses: actions/checkout@v2
+    - name: 'Clean runs'
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        gh api repos/x-pipe/w/actions/runs \
+        | jq -re '.workflow_runs |= map(select(.status != "in_progress"))' \
+        | jq -r '.workflow_runs[] | "\(.id)"' \
+        | xargs -n1 -I '{}' gh api repos/x-pipe/w/actions/runs/{} -X DELETE --silent
+    - name: 'Logging'
+      run: |
+        echo "$(TZ=UTC date +'[E] [%Y/%m/%dT%T%Z]')" > tmp.log
+    - name: 'Commit, Push'
+      run: |
+        git pull --ff --commit
+        git config --local user.name 'ghost'
+        git config --local user.email 'ghost@github.com'
+        cat tmp.log >> cleaner.log
+        git add cleaner.log
+        git commit -am "$(TZ=UTC date +'%Y/%m/%dT%T%Z')"
+        git push
+  r:
+    name: 'Clean x-pipe/r'
+    runs-on: ubuntu-latest
+    steps:
+    - name: 'Checkout code base'
+      uses: actions/checkout@v2
+    - name: 'Clean runs'
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        gh api repos/x-pipe/r/actions/runs \
+        | jq -re '.workflow_runs |= map(select(.status != "in_progress"))' \
+        | jq -r '.workflow_runs[] | "\(.id)"' \
+        | xargs -n1 -I '{}' gh api repos/x-pipe/r/actions/runs/{} -X DELETE --silent
